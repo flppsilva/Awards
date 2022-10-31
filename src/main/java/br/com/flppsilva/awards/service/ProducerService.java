@@ -7,12 +7,9 @@ import br.com.flppsilva.awards.model.Movie;
 import br.com.flppsilva.awards.model.Producer;
 import br.com.flppsilva.awards.repository.ProducerRepository;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.data.util.Pair;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
-import java.util.stream.Collectors;
-import java.util.stream.Stream;
 
 @Service
 public class ProducerService implements Loggable {
@@ -20,8 +17,7 @@ public class ProducerService implements Loggable {
     @Autowired
     ProducerRepository producerRepository;
 
-    static Pair<Integer, Integer> getShorterRange(Integer[] values) {
-        Pair<Integer, Integer> result = null;
+    static Integer getMinInterval(Integer[] values) {
         Integer minorDifference = null;
         for (int i = 0; i < values.length; i++) {
             for (int j = 0; j < values.length; j++) {
@@ -30,23 +26,23 @@ public class ProducerService implements Loggable {
                     int highestValue = Math.max(values[i], values[j]);
                     if (minorDifference == null || highestValue - lowerValue < minorDifference) {
                         minorDifference = highestValue - lowerValue;
-                        result = Pair.of(lowerValue, highestValue);
                     }
                 }
             }
         }
-        return result;
+        return minorDifference;
     }
 
-    static Pair<Integer, Integer> getLongerRange(Integer[] values) {
-        if (values.length < 2) {
-            return null;
+    static Integer getMaxInterval(Integer[] values) {
+        Integer largerDifference = null;
+        for (int i = 0; i < values.length - 1; i++) {
+            int largerValue = Math.min(values[i], values[i + 1]);
+            int highestValue = Math.max(values[i], values[i + 1]);
+            if (largerDifference == null || highestValue - largerValue > largerDifference) {
+                largerDifference = highestValue - largerValue;
+            }
         }
-
-        return Pair.of(
-                Stream.of(values).min(Integer::compare).get(),
-                Stream.of(values).max(Integer::compare).get()
-        );
+        return largerDifference;
     }
 
     public AwardsDTO findRewardInterval() {
@@ -60,31 +56,29 @@ public class ProducerService implements Loggable {
                     .filter(Movie::isWinner)
                     .map(Movie::getYear)
                     .distinct()
+                    .sorted()
                     .toArray(Integer[]::new);
 
             // there is only a gap if there are more than two years
             if (years.length >= 2) {
+                final int minInterval = getMinInterval(years);
+                final int maxInterval = getMaxInterval(years);
 
-                final Pair<Integer, Integer> minRange = getShorterRange(years);
-                final int minInterval = minRange.getSecond() - minRange.getFirst();
-                awards.putIfAbsent(minInterval, new ArrayList<>());
-                awards.get(minInterval).add(
-                        new RangeAwardsDTO()
-                                .setProducer(producer.getName())
-                                .setInterval(minInterval)
-                                .setPreviousWin(minRange.getFirst())
-                                .setFollowingWin(minRange.getSecond())
-                );
+                for (int i = 0; i < years.length - 1; i++) {
+                    final int previous = years[i];
+                    final int follow = years[i + 1];
+                    final int interval = follow - previous;
 
-                final Pair<Integer, Integer> maxRange = getLongerRange(years);
-                final int maxInterval = maxRange.getSecond() - maxRange.getFirst();
-                awards.putIfAbsent(maxInterval, new ArrayList<>());
-                awards.get(maxInterval).add(
-                        new RangeAwardsDTO()
-                                .setProducer(producer.getName())
-                                .setInterval(maxInterval)
-                                .setPreviousWin(maxRange.getFirst())
-                                .setFollowingWin(maxRange.getSecond()));
+                    if (interval == minInterval || interval == maxInterval) {
+                        awards.putIfAbsent(interval, new ArrayList<>());
+                        awards.get(interval).add(
+                                new RangeAwardsDTO()
+                                        .setProducer(producer.getName())
+                                        .setInterval(interval)
+                                        .setPreviousWin(previous)
+                                        .setFollowingWin(follow));
+                    }
+                }
             }
         });
 
@@ -93,8 +87,8 @@ public class ProducerService implements Loggable {
         final Integer max = awards.keySet().stream().max(Integer::compare).orElse(null);
 
         return new AwardsDTO(
-                min != null ? awards.get(min).stream().distinct().collect(Collectors.toList()) : Collections.emptyList(),
-                max != null ? awards.get(max).stream().distinct().collect(Collectors.toList()) : Collections.emptyList()
+                min != null ? new ArrayList<>(awards.get(min)) : Collections.emptyList(),
+                max != null ? new ArrayList<>(awards.get(max)) : Collections.emptyList()
         );
     }
 }

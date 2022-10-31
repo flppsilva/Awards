@@ -48,7 +48,7 @@ class ProducerServiceTest {
                 .setMovies(
                         List.of(
                                 new Movie().setYear(2000).setWinner(true),
-                                new Movie().setYear(2005).setWinner(true)
+                                new Movie().setYear(2003).setWinner(true)
                         )));
     }
 
@@ -84,19 +84,19 @@ class ProducerServiceTest {
     @Test
     void shouldReceiveNullWhenFewItems() {
         final Integer[] years = {1};
-        Assertions.assertNull(ProducerService.getShorterRange(years));
-        Assertions.assertNull(ProducerService.getLongerRange(years));
+        Assertions.assertNull(ProducerService.getMinInterval(years));
+        Assertions.assertNull(ProducerService.getMaxInterval(years));
     }
 
     @Test
     void shouldGetSmallestInterval() {
         final Integer[] years = {1, 3, 9, 11};
-        Assertions.assertEquals(Pair.of(1, 3), ProducerService.getShorterRange(years));
+        Assertions.assertEquals(2, ProducerService.getMinInterval(years));
     }
 
     @Test
     void shouldGetLargestInterval() {
         final Integer[] years = {1, 3, 9, 11};
-        Assertions.assertEquals(Pair.of(1, 11), ProducerService.getLongerRange(years));
+        Assertions.assertEquals(6, ProducerService.getMaxInterval(years));
     }
 }
